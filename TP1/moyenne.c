@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
     }
   printf("Moyenne est: %.2lf \n", moyenne(argc-1, n));
 
-  mempty(n);
+  free(n);
 
   return 0;
   
