@@ -7,8 +7,12 @@ const int size = 1000;
 
 unsigned char *image;
 
-int y0 = 0;
-pthread_mutex_t lock_y0 = PTHREAD_MUTEX_INITIALIZER; 
+// y0 va etre accede par plusieurs threads
+// et sert a la communication entre eux.
+// lock_y0 sert a gere l'access
+int yc = 0;
+pthread_mutex_t lock_yc = PTHREAD_MUTEX_INITIALIZER; 
+
 
 static void calcul(int x, int y, unsigned char *pixel)
 {
@@ -60,17 +64,24 @@ static void calcul(int x, int y, unsigned char *pixel)
     pixel[0]=pixel[1]=pixel[2]=0;
 }
 
-void* parallel(void* arg)
+void* parallel()
 {
-  int* a = (int*) arg;
-
-  int y1 = *a, y2 = *(a+1);
   int x,y;
-  for (y = y1; y < y2; y++)
-    for (x = 0; x < size; x++)
-      calcul(x, y, image+3*(y * size + x));
-
-  pthread_exit(0);
+  while(1)
+    {
+      pthread_mutex_lock(&lock_yc);
+      if(yc>=size)
+	{
+	  pthread_mutex_unlock(&lock_yc);
+	  pthread_exit(0);
+	}
+      y = yc;
+      yc=yc+1;
+      pthread_mutex_unlock(&lock_yc);
+      
+      for (x = 0; x < size; x++)
+	calcul(x, y, image+3*(y * size + x));
+    }
 }
 
 int main(int argc, char const *argv[])
@@ -85,22 +96,10 @@ int main(int argc, char const *argv[])
   sscanf(argv[1],"%d",&N);
   pthread_t *thread = malloc(N*sizeof(pthread_t));
 
-  int pas = size/N;
-  if(size%N != 0)
-    pas++;
-
   int n = 0;
   while(n<N)
     {
-      int y1 = pas*n;
-      int y2 = pas*(n+1);
-      if(y2>size)
-	y2 = size;
-      int *y = malloc(2*sizeof(int));
-      *y = y1;
-      *(y+1) = y2;
-      pthread_create(thread+n,NULL,parallel,(void*)y);
-
+      pthread_create(thread+n,NULL,parallel,NULL);
       n++;
     }
 

@@ -14,3 +14,8 @@ for i = 1:N
 end
 
 plot(t);
+grid on
+plot(t)
+grid on;
+xlabel('Nombre de threads')
+ylabel('Le temps (s)')
