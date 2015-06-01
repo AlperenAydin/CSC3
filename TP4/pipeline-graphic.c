@@ -32,8 +32,10 @@ sem_t fragment_sem_conso;
 int nb_rasters = 4;
 int nb_shaders = 4;
 
-// Ajouter ici les données indispensables pour synchroniser les étages (barrières ou conditions).
-// ...
+// Ajouter ici les données indispensables pour synchroniser les étages (barrières ou conditions) 
+pthread_barrier_t raster_barrier;
+pthread_barrier_t shader_barrier;
+pthread_barrier_t global_barrier;
 
 // Création des triangles
 static void *triangle_stage(void *a)
@@ -45,7 +47,6 @@ static void *triangle_stage(void *a)
   while (triangle_creator_get_next_triangle(triangle_creator, &triangle))
   {
     // Production des triangles dans le tableau des triangles :
-    // remplacer les ...
     sem_wait(&triangle_sem_prod);
     pthread_mutex_lock(&triangle_mutex);
     
@@ -55,35 +56,47 @@ static void *triangle_stage(void *a)
     pthread_mutex_unlock(&triangle_mutex);
     sem_post(&triangle_sem_conso);
     
-#if  0// à remplacer par un 1 pour traiter les synchronisation.
-    // Si le triangle est en réalité une demande de synchronisation
+#if 1
     if (triangle_is_sync(&triangle))
     {
       int i;
-      // produire le bon nombre de "triangles" de synchronisation pour tous les threads "raster_stage"
+      // produire le bon nombre de "triangles" de synchronisation 
+      // pour tous les threads "raster_stage"
+
       // Attention, on vient d'en produire déjà un !
-      for (...)
+
+      for (i=0; i<nb_rasters-1; i++)
       {
-        ...
+            sem_wait(&triangle_sem_prod);
+	    pthread_mutex_lock(&triangle_mutex);
+	    
+	    triangles[triangle_write_index] = triangle;
+	    triangle_write_index = (triangle_write_index + 1) % NB_TRIANGLES;
+    
+	    pthread_mutex_unlock(&triangle_mutex);
+	    sem_post(&triangle_sem_conso);
       }
       // On attend que tous les rasters finissent
-      // Utiliser ici une barrière ou une condition
-      ...
-      // 
+      pthread_barrier_wait(&raster_barrier);
       // produire le bon nombre de fragments de synchronisation pour tous les threads "shader_stage"
       for (i = 0; i < nb_shaders; i++)
       {
-        ...
+	sem_wait(&fragment_sem_prod);
+	pthread_mutex_lock(&fragment_mutex);
+
+	fragments[fragment_write_index] = fragment_sync();
+	fragment_write_index = (fragment_write_index + 1) % NB_FRAGMENTS;
+
+	pthread_mutex_unlock(&fragment_mutex);
+	sem_post(&fragment_sem_conso);
       }
       // On attend que tous les shaders finissent
-      // Utiliser ici une barrière ou une condition
-      ...
+      pthread_barrier_wait(&shader_barrier);
       // On vide les pipeline
       triangle_read_index = triangle_write_index = 0;
       fragment_read_index = fragment_write_index = 0;
       // On relance tout le monde
-      // Utilier ici une barière ou un broadcast sur une condition
-      ...
+      pthread_barrier_wait(&global_barrier);
     }
 #endif 
   }
@@ -111,13 +124,13 @@ void *raster_stage(void *a)
     pthread_mutex_unlock(&triangle_mutex);
     sem_post(&triangle_sem_prod);
 
-#if 0 // à remplacer par un 1 pour gérer les synchronisations.
+#if 1
     if (triangle_is_sync(&triangle))
     {
       // On attend que tout le monde finisse
-      // ...utilisation d'une barrière ou d'une condition
+      pthread_barrier_wait(&raster_barrier);
       // On attend de se faire relancer
-      //... utilisation d'une barrière ou d'une condition
+      pthread_barrier_wait(&global_barrier);
     } else
 #endif
     {
@@ -150,19 +163,19 @@ void *shader_stage(void *a)
     pthread_mutex_lock(&fragment_mutex);
 
     fragment = fragments[fragment_read_index];
-    fragment_write_index = (fragment_write_index + 1) % NB_FRAGMENTS;
+    fragment_read_index = (fragment_read_index + 1) % NB_FRAGMENTS;
 
     pthread_mutex_unlock(&fragment_mutex);
     sem_post(&fragment_sem_prod);
     
 
-#if 0 // à remplacer par un 1 pour gérer les synchronisations.
+#if 1
     if (fragment_is_sync(&fragment))
     {
       // On attend que tout le monde finisse
-      // ...utilisation d'une barrière ou d'une condition
+      pthread_barrier_wait(&shader_barrier);
       // On attend de se faire relancer
-      // ...utilisation d'une barrière ou d'une condition
+      pthread_barrier_wait(&global_barrier);
     } else
 #endif
       gpu_shader(fragment);
@@ -192,8 +205,11 @@ int main(int argc, char *argv[])
   pthread_t t_rasters[nb_rasters];   // threads stage 2
   pthread_t t_shaders[nb_shaders];   // threads stage 3
 
-  // Creer ici les barrière ou conditions utiles pour les synchros.
-  // ...
+  // Création des barrière ou conditions utiles pour les synchros.
+
+  pthread_barrier_init(&raster_barrier,NULL,nb_rasters+1);
+  pthread_barrier_init(&shader_barrier,NULL,nb_shaders+1);
+  pthread_barrier_init(&global_barrier,NULL,nb_rasters+nb_shaders+1);
 
   // Création des sémaphore pour les producteurs / consommateurs de triangles
   sem_init(&triangle_sem_conso, 0, 0);
