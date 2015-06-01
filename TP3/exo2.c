@@ -19,6 +19,7 @@ void tabInit(tabCritique* t)
 {
   pthread_mutex_init(&(t->lock), NULL);
   sem_init(&(t->sema),0,0);
+  t->somme = 0;
 }
 
 void* filtre(void* arg)
@@ -59,8 +60,8 @@ int main()
   tPairs.c = 'p'; tImpairs.c = 'i';
   
   pthread_t thrPairs, thrImpairs;
-  pthread_create(&thrPairs,NULL, filtre,&tPairs);
-  pthread_create(&thrImpairs,NULL, filtre,&tImpairs);
+  //pthread_create(&thrPairs,NULL, filtre,&tPairs);
+  //pthread_create(&thrImpairs,NULL, filtre,&tImpairs);
 
   int p=0, i=0; 
   int k=0;
@@ -99,8 +100,9 @@ int main()
   sem_post(&(tImpairs.sema));
   pthread_mutex_unlock(&(tImpairs.lock));
 
-  pthread_join(thrPairs,NULL);
-  pthread_join(thrImpairs,NULL);
+  
+  //pthread_join(thrPairs,NULL);
+  //pthread_join(thrImpairs,NULL);
 
   int sommePairs= tPairs.somme;
   int sommeImpairs = tImpairs.somme;
