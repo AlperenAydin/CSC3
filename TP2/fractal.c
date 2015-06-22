@@ -7,7 +7,7 @@ const int size = 1000;
 
 unsigned char *image;
 
-// y0 va etre accede par plusieurs threads
+// yc va etre accede par plusieurs threads
 // et sert a la communication entre eux.
 // lock_y0 sert a gere l'access
 int yc = 0;

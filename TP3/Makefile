@@ -7,4 +7,4 @@ all     : $(exec)
 
 
 clean   : 
-	rm *.o *~ $(exec)
+	rm *~ $(exec)
